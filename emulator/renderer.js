@@ -10,7 +10,7 @@ class Renderer {
         this.ctx = this.canvas.getContext("2d");
 
         this.canvas.width = this.cols * this.scale;
-        this.canvas.rows = this.rows * this.scale;
+        this.canvas.height = this.rows * this.scale;
     
         this.display = new Array(this.cols * this.rows); // 2048 pixels
     }

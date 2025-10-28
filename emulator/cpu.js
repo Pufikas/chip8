@@ -77,6 +77,7 @@ class CPU {
         req.responseType = 'arraybuffer';
 
         req.send();
+        console.log(req)
     }
 
     updateTimers() {
@@ -100,7 +101,6 @@ class CPU {
     executeInstruction(opcode) {
         // increment the program counter, each instruction is 2 bytes long
         this.pc += 2;
-    
         /*
             opcode = 0x5460
             high byte => 0x54
@@ -110,7 +110,7 @@ class CPU {
         */
 
         let x = (opcode & 0x0F00) >> 8;
-        let y = (opcode & 0x0F00) >> 4;
+        let y = (opcode & 0x00F0) >> 4;
 
         switch (opcode & 0xF000) {
             case 0x0000:
@@ -216,44 +216,103 @@ class CPU {
                 }
 
                 break;
-            case 0x9000:
+            case 0x9000: // 9xy0 SNE Vx, Vy
+                if (this.v[x] !==  this.v[y]) {
+                    this.pc += 2;
+                }
                 break;
-            case 0xA000:
+            case 0xA000: // Annn  LD I, addr
+                // if opcode is 0xA740 this returns 0x740
+                this.i = (opcode & 0xFFF);
                 break;
-            case 0xB000:
+            case 0xB000: // Bnnn JP V0, addr
+                this.pc = (opcode & 0xFFF) + this.v[0];
                 break;
-            case 0xC000:
+            case 0xC000: // Cxkk RND Vx, byte
+                let rand = Math.floor(Math.random() * 0xFF); // 0 - 255
+                this.v[x] = rand & (opcode & 0xFF);
                 break;
-            case 0xD000:
+            case 0xD000: // DRW Vx, Vy, nibble
+                let width = 8; // sprite is 8 pixels wide
+                let height = (opcode & 0xF); // last nibble of of opcode (0xD235 => 5)
+
+                this.v[0xF] = 0;
+
+                for (let row = 0; row < height; row++) {
+                    let sprite = this.memory[this.i + row];
+
+                    for (let col = 0; col < width; col++) {
+                        // if sprite is not 0, render/erase the pixel
+                        if ((sprite & 0x80) > 0) {
+                            // if setPixel returns 1, this means pixel was erased setting VF = 1
+                            if (this.renderer.setPixel(this.v[x] + col, this.v[y] + row)) {
+                                this.v[0xF] = 1;
+                            }
+                        }
+
+                        // shift the sprite left 1
+                        // 10010000 << 1 will become 0010000
+                        sprite <<= 1;
+                    }
+                }
+
                 break;
             case 0xE000:
                 switch (opcode & 0xFF) {
-                    case 0x9E:
+                    case 0x9E: // Ex9E SKP Vx
+                        if (this.keyboard.isKeyPressed(this.v[x])) {
+                            this.pc += 2;
+                        }
                         break;
-                    case 0xA1:
+                    case 0xA1: // ExA1 SKNP Vx
+                        if (!this.keyboard.isKeyPressed(this.v[x])) {
+                            this.pc += 2;
+                        }
                         break;
                 }
 
                 break;
             case 0xF000:
                 switch (opcode & 0xFF) {
-                    case 0x07:
+                    case 0x07: // Fx07 LD Vx, DT
+                        this.v[x] = this.delayTimer;
                         break;
-                    case 0x0A:
+                    case 0x0A: // Fx0A LD Vx, K
+                        this.paused = true;
+
+                        this.keyboard.onNextKeyPress = function(key) {
+                            this.v[x] = key;
+                            this.paused = false;
+                        }.bind(this);
                         break;
-                    case 0x15:
+                    case 0x15: // Fx15 LD DT, Vx
+                        this.delayTimer = this.v[x];
                         break;
-                    case 0x18:
+                    case 0x18: // Fx18 LD ST, Vx
+                        this.soundTimer = this.v[x];
                         break;
-                    case 0x1E:
+                    case 0x1E: // Fx1E ADD I, Vx
+                        this.i += this.v[x];
                         break;
-                    case 0x29:
+                    case 0x29: // Fx29 LD F, Vx
+                        this.i = this.v[x] * 5; // *5 because each sprite is 5 bytes long
                         break;
-                    case 0x33:
+                    case 0x33: // Fx33 LD B, Vx
+                        // grab hundreds, tens and ones digit from register Vx
+                        this.memory[this.i] = parseInt(this.v[x] / 1000);
+                        this.memory[this.i + 1] = parseInt((this.v[x] % 100) / 10);
+                        this.memory[this.i + 2] = parseInt(this.v[x] % 10);
                         break;
-                    case 0x55:
+                    case 0x55: // Fx55 LD [I], Vx
+                        // loop through registers V0 through Vx and store it
+                        for (let regI = 0; regI <= x; regI++) {
+                            this.memory[this.i + regI] = this.v[regI];
+                        }
                         break;
-                    case 0x65:
+                    case 0x65: // Fx65 LD Vx, [I]
+                        for (let regI = 0; regI <= x; regI++) {
+                            this.v[regI] = this.memory[this.i + regI];
+                        }
                         break;
                 }
 
@@ -266,14 +325,14 @@ class CPU {
 
     cycle() {
         for (let i = 0; i < this.speed; i++) {
-            if (this.paused) return;
-            
-            // bitwise operation
-            // because of "All instructions are 2 bytes long and are stored most-significant-byte first."
-            // need to combine two pieces of memory to get full opcode
-            // 0x1000 | 0xF0 = 0x10F0
-            let opcode = (this.memory[this.pc] << 8 | this.memory[this.pc + 1]);
-            this.executeInstruction(opcode);
+            if (!this.paused) {
+                // bitwise operation
+                // because of "All instructions are 2 bytes long and are stored most-significant-byte first."
+                // need to combine two pieces of memory to get full opcode
+                // 0x1000 | 0xF0 = 0x10F0
+                let opcode = (this.memory[this.pc] << 8 | this.memory[this.pc + 1]);
+                this.executeInstruction(opcode);
+            };
         }
         
         if (!this.paused) {

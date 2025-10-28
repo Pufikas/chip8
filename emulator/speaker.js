@@ -22,7 +22,7 @@ class Speaker {
     }
 
     play(freq) {
-        if (this.audioCtx && !this.oscillator && !muted) {
+        if (this.audioCtx && !this.oscillator && !this.muted) {
             this.oscillator = this.audioCtx.createOscillator();
 
             this.oscillator.frequency.setValueAtTime(freq || 440, this.audioCtx.currentTime);

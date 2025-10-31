@@ -12,18 +12,16 @@ const cpu = new CPU(renderer, keyboard, speaker);
 let loop;
 let fps = 60, fpsInterval, startTime, now, then, elapsed;
 
+document.getElementById("roms").addEventListener("change", init);;
+
+
 function init() {
+    let rom = document.getElementById("roms");
     fpsInterval = 1000 / fps;
     then = Date.now();
     startTime = then;
-
-    // test
-    // renderer.testRender();
-    // renderer.render();
-    //
-
     cpu.loadSpritesIntoMemory();
-    cpu.loadRom('BLINKY');
+    cpu.loadRom(`${rom.value}`)
     loop = requestAnimationFrame(step);
 }
 

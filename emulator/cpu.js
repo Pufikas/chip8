@@ -27,6 +27,24 @@ class CPU {
         this.speed = 10;
     }
 
+    reset() {
+        this.memory = new Uint8Array(4096);
+        this.v = new Uint8Array(16);
+
+        this.i = 0;
+        this.delayTimer = 0;
+        this.soundTimer = 0;
+        this.pc = 0x200;
+
+        this.stack = [];
+        this.paused = false;
+
+        this.renderer.clear();
+        this.keyboard.reset();
+
+        this.loadSpritesIntoMemory();
+    }
+
     loadSpritesIntoMemory() {
         // hex values for each sprite, each sprite is 5 bytes.
         const sprites = [

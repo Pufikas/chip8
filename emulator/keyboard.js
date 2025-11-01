@@ -27,6 +27,11 @@ class Keyboard {
         window.addEventListener("keyup", this.onKeyUp.bind(this), false);
     }
 
+    reset() {
+        this.keyPressed = [];
+        this.onNextKeyPressed = null;
+    }
+
     isKeyPressed(keyCode) {
         return this.keyPressed[keyCode];
     }

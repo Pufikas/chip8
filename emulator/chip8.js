@@ -16,6 +16,9 @@ document.getElementById("roms").addEventListener("change", init);;
 
 
 function init() {
+    if (loop) cancelAnimationFrame(loop);
+    cpu.reset();
+    
     let rom = document.getElementById("roms");
     fpsInterval = 1000 / fps;
     then = Date.now();
